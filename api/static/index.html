@@ -9,6 +9,7 @@
         <meta name="twitter:image" content="https://cloud.githubusercontent.com/assets/1655848/16257011/15711692-3856-11e6-98ca-95cce4d02b02.png">
         <meta name="twitter:site" content="tmrowco">
         <meta property="og:title" content="Electricity Map | Real-time climate impact of the European electricity production" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 
         <title>Electricity Map | Real-time climate impact of the European electricity production</title>
 
@@ -26,6 +27,8 @@
         <script src="app/browsercheck.js"></script>
         <script src="app/co2eq.js"></script>
         <script src="app/countrymap.js"></script>
+        <script src="app/countryconfig.js"></script>
+        <script src="app/exchangeconfig.js"></script>
         <script src="app/horizontalcolorbar.js"></script>
         <script src="app/exchangelayer.js"></script>
         <script src="app/countrytable.js"></script>
@@ -54,7 +57,7 @@
         <!-- end Mixpanel -->
     </head>
     <body>
-        <div id="connection-warning">
+        <div id="connection-warning" class="hide">
             <div class="inner">Oops! We're having trouble reaching the server. We'll try again in a few seconds.</div>
         </div>
         <svg class="map sea"></svg>
@@ -71,8 +74,10 @@
             </div>
         </div>
         <div class="panel-container">
-            <h1 style="line-height: 1.3; color: white; font-size: 1.4grem; padding-bottom: 15px;
-    border-bottom: solid grey 1px; margin-top: 5px;">Real-time climate impact of the European electricity production</h1>
+            <h1 style="line-height: 1.3; color: white; font-size: 1.6em; padding-bottom: 15px;
+    border-bottom: solid grey 1px; margin-top: 5px;">
+                Real-time climate impact of the European electricity production
+            </h1>
             <div class="country-table-header" style="display: none">
                 <img class="country-flag">
                 <b>
@@ -90,32 +95,37 @@
             <div class="country-table-initial-text">
                 This map shows in real-time <span style="color: lightgray">where your electricity comes from</span>
                 and <span style="color: lightgray">how much greenhouse gas (GHG)</span> was emitted to produce it.
-                <!--The map also shows renewable resources like wind and sun.<br />-->
+                <!--The map also shows renewable resources like wind and sun.--><br />
+                <br />
                 The <span style="color: lightgray">blinking arrows</span> represent electricity <span style="color: lightgray">imports and exports</span>.<br />
                 <br />
                 <span style="color: lightgray; font-size: 14px; color: white;"><i>Tip: Click on a country to start exploring ⟶</i></span><br />
+                <div class="country-picker-container" style="text-align: center">
+                    <select class="country-picker" onchange="onSelectedCountryChange();"></select>
+                </div>
             </div>
             
         </div>
+        <div style="bottom: 0; left: 0; position: absolute;">
+            <div class="watermark">
+                <a href="http://www.tmrow.co" target="_blank"><img src="tomorrow_logo_open_source.svg" style="width:160px"/></a>
+            </div>
+            <div class="contribute-text">
+                Help out with missing data by contributing on <a href="https://github.com/corradio/electricitymap#contribute" target="_blank">GitHub</a>. Follow us on <a href="https://twitter.com/tmrowco" target="_blank">Twitter</a> for the latest updates.
+            </div>
         </div>
-        <div class="watermark">
-            <a href="http://www.tmrow.co" target="_blank"><img src="tomorrow_logo_open_source.svg" style="width:160px"/></a>
-        </div>
-        <small class="contribute-text">Help out with missing data by contributing on <a href="https://github.com/corradio/electricitymap#contribute" target="_blank">GitHub</a>. Follow us on <a href="https://twitter.com/tmrowco" target="_blank">Twitter</a> for the latest updates.</small>
         <div class="loading overlay"></div>
         <div id="force-chrome-overlay" class="force-chrome" style="display: none;">
             <div class="centered">
                 <h1>Bummer!</h1>
-                <p>In order to ensure the best viewing experience we’ve optimized the Electricity Map to the Chrome web browser.</p>
-
-                <p>Please switch to Chrome in oder to view this <b>real-time visualization of Energy production in Europe</b>.</p>
+                <p>In order to ensure the best viewing experience, we’ve optimized the <b>Electricity Map</b> to the Chrome web browser.</p>
 
                 <p style="margin-top:3em;">
-                    <small>If you don't have Chrome, you can click the button below to install it, or simply <a href="/?nobrowsercheck=1">continue anyway</a> (not recommended).
+                    <small>If you want to install Chrome, you can get it <a href="https://www.google.com/chrome/browser/desktop/" target="_blank">here</a>.
                     </small>
                 </p>
                 <p style="text-align:center;">
-                    <a class="button" href="https://www.google.com/chrome/browser/desktop/">Install <img src="chromelogo-highres.png"/></a>
+                    <a class="button" href="?nobrowsercheck=1">continue anyway</a>
                 </p>
             </div>
         </div>

@@ -10,7 +10,6 @@ html, body {
     display: block;
     z-index: 99;
     height: 40px;
-    top: -40px;
     left: 0;
     transition: all 0.5s ease;
     width: 100%;
@@ -21,38 +20,29 @@ html, body {
 }
 
 #connection-warning.hide {
-    top: -40px;
-    
+    top: -60px; 
 }
 
 #connection-warning .inner {
-    width: 600px;
     display: block;
     margin: 0 auto;
     background-color: red;
-    height: 40px;
-    line-height: 40px;
+    padding: 10px;
     text-align: center;
     color: white;
     font-size: 0.8em;
     border-bottom-right-radius: 5px;
     border-bottom-left-radius: 5px;
+    max-width: 600px;
 }
 
 .contribute-text {
-    display: block;
-    position: absolute;
-    left: 0;
-    bottom: 0;
     background-color: rgba(70, 70, 70, 0.95);
     font-size: 0.6em;
     color: lightgray;
     padding: 3px 5px;
 }
 .watermark {
-    position: absolute;
-    left: 0px;
-    bottom: 15px;
     padding: 15px;
     opacity: 0.5;
     transition: all 0.5s ease;
@@ -100,7 +90,6 @@ html, body {
     padding: 10px;
     background-color: rgba(70, 70, 70, 0.95);
     border: 1px solid grey;
-    width: 350px;
     line-height: 1.7em;
 }
 .panel-container > svg {
@@ -173,6 +162,7 @@ html, body {
 
 .force-chrome .centered {
     max-width: 400px;
+    padding: 40px;
 }
 
 .force-chrome h1{

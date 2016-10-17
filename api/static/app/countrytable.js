@@ -137,12 +137,14 @@ CountryTable.prototype.show = function() {
     d3.select('.country-table-header')
         .style('display', 'block');
     this.render();
+    return this;
 }
 
 CountryTable.prototype.hide = function() {
     this.root.style('display', 'none');
     d3.select('.country-table-header')
         .style('display', 'none');
+    return this;
 }
 
 CountryTable.prototype.data = function(arg) {
@@ -151,7 +153,8 @@ CountryTable.prototype.data = function(arg) {
     if (!arg) return this._data;
     else {
         this._data = arg;
-        var exchangeData = d3.entries(this._data.exchange);
+        var exchangeData = d3.entries(this._data.exchange)
+            .filter(function(d) { return d.key != 'datetime'; });
 
         // Construct a list having each production in the same order as
         // `this.PRODUCTION_MODES`
