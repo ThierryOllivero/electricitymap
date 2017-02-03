@@ -3,4 +3,12 @@
 mongodata
 src
 grib2json
-datascience
+feeder/node_modules
+web/public/dist
+web/node_modules
+.ipynb_checkpoints/
+*.pyproj
+*.sln
+*.suo
+*.user
+/.vs/config

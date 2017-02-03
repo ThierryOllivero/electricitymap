@@ -1,0 +1,24 @@
+machine:
+  pre:
+    - curl -sSL https://s3.amazonaws.com/circle-downloads/install-circleci-docker.sh | bash -s -- 1.10.0
+    - sudo curl -L -o /usr/local/bin/docker-compose https://github.com/docker/compose/releases/download/1.9.0/docker-compose-`uname -s`-`uname -m`
+    - sudo chmod +x /usr/local/bin/docker-compose
+  services:
+    - docker
+dependencies:
+  override:
+    - touch secrets.env
+    - docker-compose build
+    - docker-compose run web npm run build-release
+    - docker-compose up -d
+    - sleep 20
+    - docker-compose logs web
+    - curl --fail -i http://localhost:8000/
+    - curl --fail -i http://localhost:8000/health
+    - curl --fail -i http://localhost:8000/v1/co2?countryCode=FR
+    - curl --fail -i http://localhost:8000/v1/exchanges?countryCode=FR
+    - curl --fail -i http://localhost:8000/v1/production?countryCode=FR
+    - curl --fail -i http://localhost:8000/v2/co2LastDay?countryCode=FR
+test:
+  override:
+    - echo "no test"
