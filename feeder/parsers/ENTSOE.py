@@ -67,7 +67,7 @@ ENTSOE_DOMAIN_MAPPINGS = {
     'SI': '10YSI-ELES-----O',
     'SK': '10YSK-SEPS-----K',
     'TR': '10YTR-TEIAS----W',
-    # 'UA': 'UA'
+    'UA': '10Y1001A1001A869'
 }
 def query_ENTSOE(session, params):
     now = arrow.utcnow()
@@ -271,13 +271,15 @@ def get_wind(values):
     if 'Wind Onshore' in values or 'Wind Offshore' in values:
         return values.get('Wind Onshore', 0) + values.get('Wind Offshore', 0)
 
+def get_geothermal(values):
+    if 'Geothermal' in values:
+        return values.get('Geothermal', 0);
+
 def get_unknown(values):
-    if 'Geothermal' in values \
-        or 'Marine' in values \
+    if 'Marine' in values \
         or 'Other renewable' in values \
         or 'Other' in values:
-        return values.get('Geothermal', 0) + \
-            values.get('Marine', 0) + \
+        return values.get('Marine', 0) + \
             values.get('Other renewable', 0) + \
             values.get('Other', 0)
 
@@ -327,7 +329,7 @@ def fetch_production(country_code, session=None):
         'countryCode': country_code,
         'datetime': production_date.datetime,
         'production': {
-            'biomass': production_values.get('Biomass', None),
+            'biomass': get_biomass(production_values),
             'coal': get_coal(production_values),
             'gas': get_gas(production_values),
             'hydro': get_hydro(production_values),
@@ -335,6 +337,7 @@ def fetch_production(country_code, session=None):
             'oil': get_oil(production_values),
             'solar': production_values.get('Solar', None),
             'wind': get_wind(production_values),
+            'geothermal': get_geothermal(production_values),
             'unknown': get_unknown(production_values)
         },
         'storage': {

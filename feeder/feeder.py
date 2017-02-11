@@ -8,6 +8,7 @@ import snappy
 from bson.binary import Binary
 from pymemcache.client.base import Client
 
+from parsers import IS
 from parsers import FR
 from parsers import ENTSOE
 from parsers import weather
@@ -105,6 +106,7 @@ PRODUCTION_PARSERS = {
     'GR': ENTSOE.fetch_production,
     'HU': ENTSOE.fetch_production,
     'IE': ENTSOE.fetch_production,
+    'IS': IS.fetch_production,
     'IT': ENTSOE.fetch_production,
     'LT': ENTSOE.fetch_production,
     'LU': ENTSOE.fetch_production,
@@ -195,7 +197,7 @@ EXCHANGE_PARSERS = {
     'HU->RO':     ENTSOE.fetch_exchange,
     'HU->RS':     ENTSOE.fetch_exchange,
     'HU->SK':     ENTSOE.fetch_exchange,
-    # 'HU->UA':     ENTSOE.fetch_exchange,
+    'HU->UA':     ENTSOE.fetch_exchange,
     # IT
     'IT->MT':     ENTSOE.fetch_exchange,
     'IT->SI':     ENTSOE.fetch_exchange,
@@ -219,11 +221,12 @@ EXCHANGE_PARSERS = {
     # PL
     'PL->SE':     ENTSOE.fetch_exchange,
     'PL->SK':     ENTSOE.fetch_exchange,
+    'PL->UA':     ENTSOE.fetch_exchange,
     # RO
     'RO->RS':     ENTSOE.fetch_exchange,
-    # 'RO->UA':     ENTSOE.fetch_exchange,
+    'RO->UA':     ENTSOE.fetch_exchange,
     # SK
-    # 'SK->UA':     ENTSOE.fetch_exchange,
+    'SK->UA':     ENTSOE.fetch_exchange,
 }
 
 PRICE_PARSERS = {
@@ -330,7 +333,7 @@ def fetch_consumptions():
             validate_consumption(obj, country_code)
             # Database insert
             result = db_upsert(col_consumption, obj, 'countryCode')
-            if (result.modified_count or result.upserted_id) and cache: cache.delete(MEMCACHED_STATE_KEY)
+            if (result.modified_count or result.upserted_id) and cache and ENV == 'development': cache.delete(MEMCACHED_STATE_KEY)
         except:
             logger.exception('Exception while fetching consumption of %s' % country_code)
 
@@ -342,7 +345,7 @@ def fetch_productions():
             validate_production(obj, country_code)
             # Database insert
             result = db_upsert(col_production, obj, 'countryCode')
-            if (result.modified_count or result.upserted_id) and cache: cache.delete(MEMCACHED_STATE_KEY)
+            if (result.modified_count or result.upserted_id) and cache and ENV == 'development': cache.delete(MEMCACHED_STATE_KEY)
         except:
             logger.exception('Exception while fetching production of %s' % country_code)
 
@@ -362,7 +365,7 @@ def fetch_exchanges():
                 raise Exception("Data from %s can't be in the future" % k)
             # Database insert
             result = db_upsert(col_exchange, obj, 'sortedCountryCodes')
-            if (result.modified_count or result.upserted_id) and cache: cache.delete(MEMCACHED_STATE_KEY)
+            if (result.modified_count or result.upserted_id) and cache and ENV == 'development': cache.delete(MEMCACHED_STATE_KEY)
         except:
             logger.exception('Exception while fetching exchange of %s' % k)
 
@@ -373,7 +376,7 @@ def fetch_price():
             if not obj: continue
             # Database insert
             result = db_upsert(col_price,obj, 'countryCode')
-            if (result.modified_count or result.upserted_id) and cache: cache.delete(MEMCACHED_STATE_KEY)
+            if (result.modified_count or result.upserted_id) and cache and ENV == 'development': cache.delete(MEMCACHED_STATE_KEY)
         except:
             logger.exception('Exception while fetching pricing of %s' % country_code)
 
@@ -447,11 +450,11 @@ def fetch_weather():
     except:
         logger.exception('fetch_weather()')
 
-def postprocess():
+def push_cache():
     try:
         subprocess.check_call(['node', 'push_cache.js'], shell=False)
     except:
-        logger.exception('postprocess()')
+        logger.exception('push_cache()')
 
 def fetch_electricity():
     # Fetch all electricity data
@@ -460,9 +463,10 @@ def fetch_electricity():
     fetch_productions()
     fetch_exchanges()
     fetch_price()
-    postprocess()
+    push_cache()
 
 migrate(db, validate_production)
+push_cache()
 
 schedule.every(15).minutes.do(fetch_weather)
 schedule.every(INTERVAL_SECONDS).seconds.do(fetch_electricity)

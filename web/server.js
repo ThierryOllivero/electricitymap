@@ -20,6 +20,8 @@ var http = require('http');
 var Memcached = require('memcached');
 var moment = require('moment');
 var MongoClient = require('mongodb').MongoClient;
+var i18n = require('i18n');
+
 //var statsd = require('node-statsd'); // TODO: Remove
 
 // Custom modules
@@ -42,6 +44,42 @@ app.use(function(req, res, next) {
 var STATIC_PATH = process.env['STATIC_PATH'] || (__dirname + '/public');
 app.use(express.static(STATIC_PATH, {etag: true, maxAge: isProduction ? '24h': '0'}));
 app.set('view engine', 'ejs');
+
+// * i18n
+i18n.configure({
+    // where to store json files - defaults to './locales' relative to modules directory
+    locales: ['en', 'fr', 'it', 'nl'],
+    directory: __dirname + '/locales',
+    defaultLocale: 'en',
+    queryParameter: 'lang',
+    objectNotation: true,
+    updateFiles: false // whether to write new locale information to disk - defaults to true
+});
+app.use(i18n.init);
+LOCALE_TO_FB_LOCALE = {
+    'en': 'en_US',
+    'fr': 'fr_FR',
+    'it': 'it_IT',
+    'nl': 'nl_NL'
+};
+// Populate using
+// https://www.facebook.com/translations/FacebookLocales.xml |grep 'en_'
+// and re-crawl using
+// http POST https://graph.facebook.com\?id\=https://www.electricitymap.org\&amp\;scrape\=true\&amp\;locale\=\en_US,fr_FR,it_IT.......
+SUPPORTED_FB_LOCALES = [
+    'en_GB',
+    'en_IN',
+    'en_PI',
+    'en_UD',
+    'en_US',
+    'fr_CA',
+    'fr_FR',
+    'it_IT',
+    'nl_BE',
+    'nl_NL',
+];
+
+// * Long-term caching
 var BUNDLE_HASH = !isProduction ? 'dev' : 
     JSON.parse(fs.readFileSync(STATIC_PATH + '/dist/manifest.json')).hash;
 
@@ -153,31 +191,32 @@ app.get('/v1/state', function(req, res) {
     var t0 = new Date().getTime();
     function returnObj(obj, cached) {
         var deltaMs = new Date().getTime() - t0;
-        res.json({status: 'ok', data: obj, took: deltaMs + 'ms'});
+        res.json({status: 'ok', data: obj, took: deltaMs + 'ms', cached: cached});
     }
     if (req.query.datetime) {
         // Ignore requests in the future
         if (moment(req.query.datetime) > moment.now())
-            returnObj({countries: {}, exchanges: {}});
+            returnObj({countries: {}, exchanges: {}}, false);
         db.queryLastValuesBeforeDatetime(req.query.datetime, function (err, result) {
             if (err) {
                 //statsdClient.increment('state_GET_ERROR');
                 handleError(err);
                 res.status(500).json({error: 'Unknown database error'});
             } else {
-                returnObj(result);
+                returnObj(result, false);
             }
         });
     } else {
         return db.getCached('state',
-            function (err, data) {
+            function (err, data, cached) {
                 if (err) {
                     if (opbeat) 
                         opbeat.captureError(err);
                     console.error(err);
-                    res.status(500).json({error: 'Unknown database error'});
+                    return res.status(500)
+                        .json({error: 'Unknown database error'});
                 }
-                if (data) returnObj(data);
+                returnObj(data || {'countries': [], 'exchanges': []}, cached);
             },
             5 * 60,
             db.queryLastValues);
@@ -188,8 +227,15 @@ app.get('/v1/co2', function(req, res) {
     var t0 = new Date().getTime();
     var countryCode = req.query.countryCode;
 
+    function getCachedState(callback) {
+        return db.getCached('state',
+            callback,
+            5 * 60,
+            db.queryLastValues);
+    }
+
     // TODO: Rewrite this api with two promises [geocoder, state]
-    function onCo2Computed(err, obj) {
+    function onCo2Computed(err, obj, cached) {
         var countries = obj.countries;
         if (err) {
             //statsdClient.increment('co2_GET_ERROR');
@@ -200,9 +246,10 @@ app.get('/v1/co2', function(req, res) {
             responseObject = {
                 status: 'ok',
                 countryCode: countryCode,
-                co2intensity: countries[countryCode].co2intensity,
+                co2intensity: (countries[countryCode] || {}).co2intensity,
                 unit: 'gCo2eq/kWh',
-                data: countries[countryCode]
+                data: countries[countryCode],
+                cached: cached
             };
             responseObject.took = deltaMs + 'ms';
             res.json(responseObject);
@@ -223,7 +270,7 @@ app.get('/v1/co2', function(req, res) {
                             .filter(function(d) { return d.types.indexOf('country') != -1; });
                         if (obj.length) {
                             countryCode = obj[0].short_name;
-                            db.queryLastValues(onCo2Computed);
+                            getCachedState(onCo2Computed);
                         }
                         else {
                             console.error('Geocoder returned no usable results');
@@ -236,7 +283,7 @@ app.get('/v1/co2', function(req, res) {
                 res.status(500).json({error: 'Error while geocoding'});
             });
         } else {
-            db.queryLastValues(onCo2Computed);
+            getCachedState(onCo2Computed);
         }
     } else {
         res.status(400).json({'error': 'Missing arguments "lon" and "lat" or "countryCode"'})
@@ -307,14 +354,14 @@ function handleForecastQuery(key, req, res) {
         return res.status(400).json({'error': 'Parameter `refTime` is missing'});
     if (!req.query.targetTime)
         return res.status(400).json({'error': 'Parameter `targetTime` is missing'});
-    queryGfsAt(key, req.query.refTime, req.query.targetTime, (err, obj) => {
+    db.queryGfsAt(key, req.query.refTime, req.query.targetTime, (err, obj) => {
         if (err) {
             handleError(err);
             return res.status(500).send('Unknown server error');
         } else if (!obj) {
             return res.status(404).send('Forecast was not found');
         } else {
-            return decompressGfs(obj['data'].buffer, (err, result) => {
+            return db.decompressGfs(obj['data'].buffer, (err, result) => {
                 if (err) {
                     handleError(err);
                     return res.status(500).send('Unknown server error');
@@ -349,7 +396,7 @@ app.get('/v2/history', function(req, res) {
     if (!countryCode) return res.status(400).send('countryCode required');
 
     return db.getCached('HISTORY_' + countryCode,
-        function (err, data) {
+        function (err, data, cached) {
             if (err) {
                 if (opbeat)
                     opbeat.captureError(err); 
@@ -358,7 +405,7 @@ app.get('/v2/history', function(req, res) {
             // } else if (!data) {
             //     res.status(500).send('No data was found');
             } else {
-                res.json({ 'data': data })
+                res.json({ 'data': data, 'cached': cached })
             }
         });
 });
@@ -381,6 +428,9 @@ app.get('/health', function(req, res) {
         }
     });
 });
+app.get('/clientVersion', function(req, res) {
+    res.send(BUNDLE_HASH);
+});
 app.get('/', function(req, res) {
     // On electricitymap.tmrow.co,
     // redirect everyone except the Facebook crawler,
@@ -390,8 +440,18 @@ app.get('/', function(req, res) {
         // Redirect
         res.redirect(301, 'http://www.electricitymap.org' + req.path);
     } else {
+        // Set locale if facebook requests it
+        if (req.query.fb_locale) {
+            // Locales are formatted according to 
+            // https://developers.facebook.com/docs/internationalization/#locales
+            lr = req.query.fb_locale.split('_', 2);
+            res.setLocale(lr[0]);
+        }
         res.render('pages/index', {
-            'bundleHash': BUNDLE_HASH,
+            bundleHash: BUNDLE_HASH,
+            locale: res.locale,
+            FBLocale: LOCALE_TO_FB_LOCALE[res.locale],
+            supportedFBLocales: SUPPORTED_FB_LOCALES,
             useAnalytics: req.get('host').indexOf('electricitymap') != -1
         });
     }
